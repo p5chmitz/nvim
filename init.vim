@@ -1,7 +1,9 @@
+" use :source $MYVIMRC to update without reloading nvim
+
+" Plugin manager junegunn/vim-plug
+"""""""""""""""""""""""""""""""""""""""""""
 call plug#begin('~/.config/nvim/autoload/plugged')
 
-" PLUGINS
-" ++++++++++++++++++++
 " Color theme
 Plug 'morhetz/gruvbox'
 
@@ -9,8 +11,8 @@ Plug 'morhetz/gruvbox'
 Plug 'lewis6991/gitsigns.nvim'
 
 " Semantic language support
+" Configured with Lua LSP config below
 Plug 'neovim/nvim-lspconfig'
-"Plug 'ray-x/lsp_signature.nvim'
 
 " hrsh7th's omni-completion requires neovim/nvim-lspconfig
 Plug 'hrsh7th/cmp-nvim-lsp', {'branch': 'main'}
@@ -22,84 +24,83 @@ Plug 'hrsh7th/nvim-cmp', {'branch': 'main'}
 Plug 'hrsh7th/cmp-vsnip', {'branch': 'main'}
 Plug 'hrsh7th/vim-vsnip'
 
-" Syntactic language support
+" Language syntax support
 Plug 'cespare/vim-toml'
 Plug 'stephpy/vim-yaml'
 Plug 'rust-lang/rust.vim'
 Plug 'rhysd/vim-clang-format'
 Plug 'plasticboy/vim-markdown'
 
-" ++++++++++++++++++++++
+" Fuzzy finder (with required dependancy)
+Plug 'nvim-telescope/telescope.nvim', { 'branch': '0.1.x' }
+Plug 'nvim-lua/plenary.nvim'
+Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}
+
 call plug#end()
 
-" Sets numbered rows in the UI
+" Sets basic UI elements
+""""""""""""""""""""""""
+" Sets (absolute) numbered rows in the UI
 set number
 
-" Sets color theme
-"autocmd vimenter * ++nested colorscheme gruvbox
+" Sets nvim color theme
 colorscheme gruvbox
 
-"Rrust LSP
-lua require'lspconfig'.rust_analyzer.setup({})
+" Automatically equalize split widths on window resize
+autocmd VimResized * wincmd =
 
-"Some bullshit that doesn't work
-lua << EOF
-  vim.diagnostic.config{
-    virtual_text = false,
-    signs = true,
-    float = true,
-    underline = true,
-    update_in_insert = true,
-    severity_sort = true,
-  }
-EOF
-
-" Set updatetime for various functionality
-set updatetime=250
-
-" Define autocmd for CursorHold and CursorHoldI events
-augroup DiagnosticFloat
-  autocmd!
-  autocmd CursorHold,CursorHoldI * call OpenDiagnosticFloat()
-augroup END
-
-" Function to open diagnostic float window, used with autocmd above
+" Opens option and definition float windows
+"set updatetime=250
+"augroup DiagnosticFloat
+"  autocmd!
+"  autocmd CursorHold,CursorHoldI * call OpenDiagnosticFloat()
+"augroup END
 function! OpenDiagnosticFloat() abort
   lua vim.diagnostic.open_float(nil, {focus=false})
 endfunction
 
+" Language and semantics
+""""""""""""""""""""""""
+" Rrust LSP
+"lua require'lspconfig'.rust_analyzer.setup({})
+
 " Custom keybinds and associated functions
-" Jumps to a function definition by entering gd in normal mode
+""""""""""""""""""""""""""""""""""""""""""
+" Use ctrl + v to create vertical window split
+nnoremap <C-s> :vsplit<CR> 
+
+" Use ctrl + l or h to move to adjacent windows
+nnoremap <C-l> <C-w>l 
+nnoremap <C-h> <C-w>h 
+
+" Jumps to a function def. by entering gd in normal mode
+" Use <C-o> to get back to where the cursor began
 nnoremap <silent> gd :lua vim.lsp.buf.definition()<CR>
 
-" Jumps to the use of a function by entering gu in normal mode
-nnoremap <silent> gu :call JumpToFunctionUses()<CR>
-function! JumpToFunctionUses() abort
-    " Get the visually selected text
-    let selected_text = getreg('v')
+" Sets space as leader and localmapleader
+let mapleader = " " 
+let localmapleader = " " 
 
-    " Escape special characters in the selected text for searching
-    let escaped_text = escape(selected_text, '.*\[]^$~')
+" Telescope bindings
+" NOTE: Live grep requires a Ripgrep install
+nnoremap <leader>ff <cmd>Telescope find_files<CR>
+nnoremap <leader>fg <cmd>Telescope live_grep<CR> 
+nnoremap <leader>fb <cmd>Telescope buffers<CR>
+nnoremap <leader>fh <cmd>Telescope help_tags<CR>
 
-    " Search for occurrences of the selected text (function) using a global search
-    execute 'vimgrep /' . escaped_text . '/j **/*.rs'
+" Remaps the escape key to double leader 
+inoremap <leader><leader> <Esc>
 
-    " Open the quickfix window to display the search results
-    copen
-endfunction
-
-lua <<EOF
+" Lua block configures nvim-cmp, lspconfig, and gitsigns plugins
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+lua << EOF
   -- Set up nvim-cmp.
   local cmp = require'cmp'
-
   cmp.setup({
     snippet = {
       -- REQUIRED - you must specify a snippet engine
       expand = function(args)
-        vim.fn["vsnip#anonymous"](args.body) -- For `vsnip` users.
-        -- require('luasnip').lsp_expand(args.body) -- For `luasnip` users.
-        -- require('snippy').expand_snippet(args.body) -- For `snippy` users.
-        -- vim.fn["UltiSnips#Anon"](args.body) -- For `ultisnips` users.
+        vim.fn["vsnip#anonymous"](args.body)
       end,
     },
     window = {
@@ -115,33 +116,28 @@ lua <<EOF
     }),
     sources = cmp.config.sources({
       { name = 'nvim_lsp' },
-      { name = 'vsnip' }, -- For vsnip users.
-      -- { name = 'luasnip' }, -- For luasnip users.
-      -- { name = 'ultisnips' }, -- For ultisnips users.
-      -- { name = 'snippy' }, -- For snippy users.
+      { name = 'vsnip' }, 
     }, {
       { name = 'buffer' },
     })
   })
-
-  -- Set configuration for specific filetype.
+  -- Set configuration for specific filetype
   cmp.setup.filetype('gitcommit', {
     sources = cmp.config.sources({
-      { name = 'git' }, -- You can specify the `git` source if [you were installed it](https://github.com/petertriho/cmp-git).
+      { name = 'git' }, 
+      -- You can specify the `git` source if [you installed it](https://github.com/petertriho/cmp-git)
     }, {
       { name = 'buffer' },
     })
   })
-
-  -- Use buffer source for `/` and `?` (if you enabled `native_menu`, this won't work anymore).
+  -- Use buffer source for `/` and `?` (if you enabled `native_menu`, this won't work anymore)
   cmp.setup.cmdline({ '/', '?' }, {
     mapping = cmp.mapping.preset.cmdline(),
     sources = {
       { name = 'buffer' }
     }
   })
-
-  -- Use cmdline & path source for ':' (if you enabled `native_menu`, this won't work anymore).
+  -- Use cmdline & path source for ':' (if you enabled `native_menu`, this won't work anymore)
   cmp.setup.cmdline(':', {
     mapping = cmp.mapping.preset.cmdline(),
     sources = cmp.config.sources({
@@ -151,16 +147,16 @@ lua <<EOF
     })
   })
 
-  -- Set up lspconfig.
+  -- LSP configuration
   local capabilities = require('cmp_nvim_lsp').default_capabilities()
-  -- Replace <YOUR_LSP_SERVER> with each lsp server you've enabled.
   require('lspconfig')['rust_analyzer'].setup {
     capabilities = capabilities,
     hoverAction = {
       maxLines = 30,
-      MaxColumns = 120,
+      MaxColumns = 50,
     },
   }
+
   -- Set up Git Signs
   require('gitsigns').setup {
   signs = {
@@ -172,7 +168,7 @@ lua <<EOF
     untracked    = { text = '┆' },
   },
   signcolumn = true,  -- Toggle with `:Gitsigns toggle_signs`
-  numhl      = false, -- Toggle with `:Gitsigns toggle_numhl`
+  numhl      = true, -- Toggle with `:Gitsigns toggle_numhl`
   linehl     = false, -- Toggle with `:Gitsigns toggle_linehl`
   word_diff  = false, -- Toggle with `:Gitsigns toggle_word_diff`
   watch_gitdir = {
@@ -199,9 +195,6 @@ lua <<EOF
     relative = 'cursor',
     row = 0,
     col = 1
-  },
-  yadm = {
-    enable = false
-  },
+  }
 }
 EOF
