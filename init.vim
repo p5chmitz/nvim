@@ -29,7 +29,8 @@ Plug 'cespare/vim-toml'
 Plug 'stephpy/vim-yaml'
 Plug 'rust-lang/rust.vim'
 Plug 'rhysd/vim-clang-format'
-"Plug 'plasticboy/vim-markdown'
+"Plug 'plasticboy/vim-markdown' "Neovim handles MD by default
+Plug 'jxnblk/vim-mdx-js'
 
 " Fuzzy finder (with required dependancy)
 Plug 'nvim-telescope/telescope.nvim', { 'branch': '0.1.x' }
@@ -44,6 +45,8 @@ call plug#end()
 
 " Sets basic UI elements
 """"""""""""""""""""""""
+" Opens three empty buffers at launch
+
 " Sets (absolute) numbered rows in the UI
 set number
 
@@ -53,15 +56,32 @@ colorscheme gruvbox
 " Automatically equalize split widths on window resize
 autocmd VimResized * wincmd =
 
+" Turns on the spell checker for MD files by default
+augroup markdown_spell
+    autocmd!
+    autocmd FileType markdown setlocal spell spelllang=en_us
+augroup END
+
 " Opens option and definition float windows
 "set updatetime=250
 "augroup DiagnosticFloat
 "  autocmd!
 "  autocmd CursorHold,CursorHoldI * call OpenDiagnosticFloat()
 "augroup END
-function! OpenDiagnosticFloat() abort
-  lua vim.diagnostic.open_float(nil, {focus=false})
-endfunction
+"function! OpenDiagnosticFloat() abort
+"  lua vim.diagnostic.open_float(nil, {focus=false})
+"endfunction
+
+" Disables automatic virtual text like error messages
+"lua << EOF
+"   vim.diagnostic.config({
+"     virtual_text = false,
+"   })
+"EOF
+
+" Disables virtual text (errors) by default, and sets E for diagnostic popup
+call luaeval('vim.diagnostic.config({ virtual_text = false })')
+nnoremap <silent> <S-e> :lua vim.diagnostic.open_float(nil, { focus = false })<CR>
 
 " Custom keybinds and associated functions
 """"""""""""""""""""""""""""""""""""""""""
@@ -70,7 +90,7 @@ let mapleader = " "
 let localmapleader = " " 
 
 " Sets <S-k> to "hover" 
-nnoremap <silent> K :lua vim.lsp.buf.hover()<CR>
+nnoremap <silent> <S-k> :lua vim.lsp.buf.hover()<CR>
 
 " Alias opening a file explorer within an existing buffer
 " Replaced by nvim-tree
@@ -100,6 +120,7 @@ nnoremap <leader>fh <cmd>Telescope help_tags<CR>
 
 " Remaps the escape key to double leader 
 inoremap <C-e> <Esc>
+nnoremap <C-e> <Esc>
 
 " Toggles file explorer
 nnoremap <leader>e <cmd>:NvimTreeToggle<CR>
@@ -137,6 +158,9 @@ lua << EOF
 
   -- pass to setup along with your other options
   require("nvim-tree").setup {
+    git = {
+        ignore = false, -- Show files listed in .gitignore
+    },
     ---
     on_attach = my_on_attach,
     ---
@@ -197,14 +221,42 @@ lua << EOF
   })
 
   -- LSP configuration
-  local capabilities = require('cmp_nvim_lsp').default_capabilities()
-  require('lspconfig')['rust_analyzer'].setup {
-    capabilities = capabilities,
-    hoverAction = {
-      maxLines = 30,
-      MaxColumns = 50,
-    },
-  }
+  --local capabilities = require('cmp_nvim_lsp').default_capabilities()
+  --require('lspconfig')['rust_analyzer'].setup {
+  --  capabilities = capabilities,
+  --  hoverAction = {
+  --    maxLines = 30,
+  --    MaxColumns = 50,
+  --  },
+  --}
+
+  local lspconfig = require'lspconfig'
+  
+  local on_attach = function(client)
+      require'completion'.on_attach(client)
+  end
+  
+  lspconfig.rust_analyzer.setup({
+      on_attach = on_attach,
+      settings = {
+          ["rust-analyzer"] = {
+              imports = {
+                  granularity = {
+                      group = "module",
+                  },
+                  prefix = "self",
+              },
+              cargo = {
+                  buildScripts = {
+                      enable = true,
+                  },
+              },
+              procMacro = {
+                  enable = true
+              },
+          }
+      }
+  })
 
   -- Set up Git Signs
   require('gitsigns').setup {
@@ -219,7 +271,7 @@ lua << EOF
     signcolumn = false,  -- Toggle with `:Gitsigns toggle_signs`
     numhl      = true, -- Toggle with `:Gitsigns toggle_numhl`
     linehl     = false, -- Toggle with `:Gitsigns toggle_linehl`
-    word_diff  = true, -- Toggle with `:Gitsigns toggle_word_diff`
+    word_diff  = false, -- Toggle with `:Gitsigns toggle_word_diff`
     watch_gitdir = {
       follow_files = true
     },
